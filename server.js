@@ -178,16 +178,45 @@ class GameRoom {
                 life: 10
             });
             
-            // Push sticks apart
+            // Calculate velocities and determine winner
             const v1 = p1.stickVelocity;
             const v2 = p2.stickVelocity;
+            const velocityDiff = Math.abs(v1 - v2);
             
-            if (v1 > v2) {
-                p2.stickAngle += 0.1 * (v1 / (v1 + v2 + 0.1));
+            // Calculate bounce direction - away from collision point
+            if (v1 > v2 + 1) { // Player 1's stick is significantly faster
+                // Calculate angle from collision to p2's stick pivot
+                const pivotX = p2.x + 12;
+                const pivotY = p2.y + 16;
+                const bounceAngle = Math.atan2(pivotY - intersection.y, pivotX - intersection.x);
+                
+                // Knock p2's stick backward
+                const bounceForce = 0.3 + (velocityDiff * 0.05);
+                p2.stickAngle -= bounceForce;
                 p2.targetStickAngle = p2.stickAngle;
-            } else {
-                p1.stickAngle += 0.1 * (v2 / (v1 + v2 + 0.1));
+                
+                // Slight deflection for p1's stick
+                p1.stickAngle += 0.05;
                 p1.targetStickAngle = p1.stickAngle;
+            } else if (v2 > v1 + 1) { // Player 2's stick is significantly faster
+                // Calculate angle from collision to p1's stick pivot
+                const pivotX = p1.x + 12;
+                const pivotY = p1.y + 16;
+                const bounceAngle = Math.atan2(pivotY - intersection.y, pivotX - intersection.x);
+                
+                // Knock p1's stick backward
+                const bounceForce = 0.3 + (velocityDiff * 0.05);
+                p1.stickAngle -= bounceForce;
+                p1.targetStickAngle = p1.stickAngle;
+                
+                // Slight deflection for p2's stick
+                p2.stickAngle += 0.05;
+                p2.targetStickAngle = p2.stickAngle;
+            } else { // Similar velocities - both bounce slightly
+                p1.stickAngle -= 0.1;
+                p1.targetStickAngle = p1.stickAngle;
+                p2.stickAngle += 0.1;
+                p2.targetStickAngle = p2.stickAngle;
             }
         } else {
             // Check body hits if sticks aren't blocking
@@ -283,6 +312,14 @@ class GameRoom {
         const player = this.players.find(p => p.id === playerId);
         if (!player) return;
         
+        // Map boundaries
+        const mapBounds = {
+            left: 50,
+            right: 750,
+            top: 50,
+            bottom: 550
+        };
+        
         // Update player movement
         const staminaPercent = player.stamina / 100;
         const speed = 3 * (0.3 + 0.7 * staminaPercent);
@@ -290,19 +327,19 @@ class GameRoom {
         player.isMoving = false;
         
         if (input.keys['w'] || input.keys['W']) {
-            player.y -= speed;
+            player.y = Math.max(mapBounds.top, player.y - speed);
             player.isMoving = true;
         }
         if (input.keys['s'] || input.keys['S']) {
-            player.y += speed;
+            player.y = Math.min(mapBounds.bottom - 32, player.y + speed); // 32 is player height
             player.isMoving = true;
         }
         if (input.keys['a'] || input.keys['A']) {
-            player.x -= speed;
+            player.x = Math.max(mapBounds.left, player.x - speed);
             player.isMoving = true;
         }
         if (input.keys['d'] || input.keys['D']) {
-            player.x += speed;
+            player.x = Math.min(mapBounds.right - 24, player.x + speed); // 24 is player width
             player.isMoving = true;
         }
         

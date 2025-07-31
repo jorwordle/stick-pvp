@@ -149,6 +149,18 @@ function gameLoop() {
         ctx.lineTo(canvas.width, i);
         ctx.stroke();
     }
+    
+    // Draw map borders
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(50, 50, 700, 500);
+    
+    // Draw corner markers
+    ctx.fillStyle = '#888';
+    const corners = [[50, 50], [750, 50], [50, 550], [750, 550]];
+    corners.forEach(([x, y]) => {
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+    });
 
     if (network.isConnected()) {
         // Send input to server
