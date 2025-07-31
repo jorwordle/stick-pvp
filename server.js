@@ -325,24 +325,26 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', (data) => {
         const { roomId, playerId } = data;
         
-        let room = rooms.get(roomId);
+        // Always use the global room
+        const globalRoomId = 'global';
+        let room = rooms.get(globalRoomId);
         if (!room) {
-            room = new GameRoom(roomId);
-            rooms.set(roomId, room);
+            room = new GameRoom(globalRoomId);
+            rooms.set(globalRoomId, room);
         }
         
         if (room.addPlayer(playerId, socket.id)) {
-            socket.join(roomId);
-            players.set(socket.id, { playerId, roomId });
+            socket.join(globalRoomId);
+            players.set(socket.id, { playerId, roomId: globalRoomId });
             
             socket.emit('joinedRoom', {
                 playerId,
-                roomId,
+                roomId: globalRoomId,
                 playerNumber: room.players.length
             });
             
             if (room.players.length === 2) {
-                io.to(roomId).emit('gameStart');
+                io.to(globalRoomId).emit('gameStart');
             }
         } else {
             socket.emit('roomFull');

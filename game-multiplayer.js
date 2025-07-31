@@ -104,11 +104,13 @@ class Player {
 
 // Initialize multiplayer
 function initMultiplayer() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('room') || 'default';
-    const serverUrl = urlParams.get('server') || 'http://localhost:3000';
+    // Auto-detect server URL from current location
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const serverUrl = `${protocol}//${host}`;
     
-    network.connect(serverUrl, roomId);
+    // Everyone joins the same room automatically
+    network.connect(serverUrl, 'global');
 }
 
 // Input event listeners

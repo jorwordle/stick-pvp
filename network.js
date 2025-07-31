@@ -33,20 +33,24 @@ class NetworkManager {
         this.socket.on('joinedRoom', (data) => {
             this.playerId = data.playerId;
             this.playerNumber = data.playerNumber;
-            console.log(`Joined room ${data.roomId} as player ${data.playerNumber}`);
+            console.log(`Joined as player ${data.playerNumber}`);
             
             // Update UI
             const statusEl = document.getElementById('connectionStatus');
             if (statusEl) {
-                statusEl.textContent = `Connected as Player ${data.playerNumber}. Waiting for opponent...`;
+                if (data.playerNumber === 1) {
+                    statusEl.textContent = `You're Player 1 (Blue). Waiting for opponent...`;
+                } else {
+                    statusEl.textContent = `You're Player 2 (Red). Get ready!`;
+                }
             }
         });
         
         this.socket.on('roomFull', () => {
-            console.log('Room is full');
+            console.log('Game is full');
             const statusEl = document.getElementById('connectionStatus');
             if (statusEl) {
-                statusEl.textContent = 'Room is full. Try another room.';
+                statusEl.textContent = 'Game is full. Please wait for a player to leave.';
             }
         });
         
