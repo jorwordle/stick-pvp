@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stick Combat PvP - Home</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(74, 144, 226, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(226, 74, 74, 0.1) 0%, transparent 50%);
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        .subtitle {
+            font-size: 20px;
+            color: #ccc;
+            margin-bottom: 40px;
+        }
+        .buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+        .btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background-color: #4a90e2;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #3a7bc8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4);
+        }
+        .btn-secondary {
+            background-color: #666;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #777;
+            transform: translateY(-2px);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        .feature {
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .feature h3 {
+            color: #4a90e2;
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin-top: 40px;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .controls h3 {
+            color: #e24a4a;
+            margin-bottom: 15px;
+        }
+        .control-item {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        .stick-icon {
+            display: inline-block;
+            width: 60px;
+            height: 4px;
+            background-color: #8b4513;
+            transform: rotate(-45deg);
+            margin: 0 10px;
+            position: relative;
+            top: -10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ Stick Combat PvP ⚔️</h1>
+        <p class="subtitle">Physics-based multiplayer stick fighting game</p>
+        
+        <div class="buttons">
+            <a href="/play" class="btn btn-primary">Play Multiplayer</a>
+            <a href="/index.html" class="btn btn-secondary">Play Solo</a>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🎮 Real-time PvP</h3>
+                <p>Battle against players in intense 1v1 duels</p>
+            </div>
+            <div class="feature">
+                <h3>⚡ Physics Combat</h3>
+                <p>Sticks collide and block realistically</p>
+            </div>
+            <div class="feature">
+                <h3>💪 Stamina System</h3>
+                <p>Manage your energy for strategic gameplay</p>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <h3>How to Play</h3>
+            <div class="control-item">
+                <strong>WASD</strong> - Move your character
+            </div>
+            <div class="control-item">
+                <strong>Mouse</strong> - Aim your stick
+                <span class="stick-icon"></span>
+            </div>
+            <div class="control-item">
+                <strong>Strategy</strong> - Block attacks, manage stamina, strike when opponent is weak!
+            </div>
+        </div>
+    </div>
+</body>
+</html>

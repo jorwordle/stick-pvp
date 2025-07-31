@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stick Combat PvP - Multiplayer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2a2a2a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            border: 2px solid #444;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        #connectionStatus {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            text-align: center;
+            z-index: 100;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+        }
+        #roomInfo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #joinForm {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 200;
+        }
+        #joinForm input {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            width: 200px;
+        }
+        #joinForm button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+        #joinForm button:hover {
+            background-color: #3a7bc8;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        Use WASD to move, Mouse to aim stick
+    </div>
+    
+    <div id="roomInfo" style="display: none;">
+        Room: <span id="roomId"></span>
+    </div>
+    
+    <div id="joinForm">
+        <h2>Join Multiplayer Game</h2>
+        <input type="text" id="serverInput" placeholder="Server URL" value="http://localhost:3000">
+        <br>
+        <input type="text" id="roomInput" placeholder="Room Name" value="room1">
+        <br>
+        <button onclick="joinGame()">Join Game</button>
+        <br><br>
+        <small>Share the room name with your friend!</small>
+    </div>
+    
+    <div id="connectionStatus" style="display: none;">
+        Connecting to server...
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600" style="display: none;"></canvas>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="network.js"></script>
+    <script>
+        function joinGame() {
+            const serverUrl = document.getElementById('serverInput').value;
+            const roomId = document.getElementById('roomInput').value;
+            
+            if (!serverUrl || !roomId) {
+                alert('Please enter server URL and room name');
+                return;
+            }
+            
+            // Hide join form
+            document.getElementById('joinForm').style.display = 'none';
+            
+            // Show game elements
+            document.getElementById('gameCanvas').style.display = 'block';
+            document.getElementById('connectionStatus').style.display = 'block';
+            document.getElementById('roomInfo').style.display = 'block';
+            document.getElementById('roomId').textContent = roomId;
+            
+            // Update URL params
+            const url = new URL(window.location);
+            url.searchParams.set('server', serverUrl);
+            url.searchParams.set('room', roomId);
+            window.history.pushState({}, '', url);
+            
+            // Load game
+            const script = document.createElement('script');
+            script.src = 'game-multiplayer.js';
+            document.body.appendChild(script);
+        }
+        
+        // Check if URL has params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('room') && urlParams.get('server')) {
+            joinGame();
+        }
+    </script>
+</body>
+</html>
