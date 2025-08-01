@@ -33,6 +33,29 @@ const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 const players = new Map();
 
+// Weapon configurations
+const WEAPONS = {
+    stick: {
+        name: 'Stick',
+        length: 60,
+        damage: 1,
+        speed: 1,
+        color: '#8b4513',
+        type: 'melee'
+    },
+    bow: {
+        name: 'Bow',
+        length: 65,
+        damage: 0.7, // Less melee damage
+        speed: 0.8,
+        color: '#654321',
+        type: 'ranged',
+        chargeTime: 2000, // 2 seconds for full charge
+        projectileSpeed: 15,
+        staminaPerCharge: 0.5
+    }
+};
+
 class GameRoom {
     constructor(id) {
         this.id = id;
@@ -40,7 +63,8 @@ class GameRoom {
         this.gameState = {
             player1: null,
             player2: null,
-            effects: []
+            effects: [],
+            projectiles: []
         };
         this.updateInterval = null;
     }
@@ -53,7 +77,7 @@ class GameRoom {
             socketId: socketId,
             x: this.players.length === 0 ? 400 : 600,
             y: 400,
-            health: 100,
+            health: 10000,
             stamina: 100,
             stickAngle: 0,
             targetStickAngle: 0,
@@ -70,7 +94,15 @@ class GameRoom {
             dashVelocity: { x: 0, y: 0 },
             dashTime: 0,
             // Crouch mechanics
-            isCrouching: false
+            isCrouching: false,
+            // Weapon system
+            weapons: ['stick', 'bow'], // Available weapons
+            selectedWeaponSlot: 0, // 0-based index
+            currentWeapon: 'stick',
+            // Bow charging
+            isCharging: false,
+            chargeLevel: 0,
+            chargeStartTime: 0
         };
         
         this.players.push(playerData);
@@ -150,7 +182,7 @@ class GameRoom {
             
             // Drain stamina for stick movement
             if (Math.abs(actualAngleChange) > 0.01) {
-                player.stamina = Math.max(0, player.stamina - 0.2 * Math.abs(actualAngleChange));
+                player.stamina = Math.max(0, player.stamina - 0.15 * Math.abs(actualAngleChange));
             }
             
             player.stickAngle += actualAngleChange;
@@ -165,6 +197,15 @@ class GameRoom {
                 if (Date.now() - player.lastDashTime >= 10000) { // 10 second cooldown
                     player.dashReady = true;
                 }
+            }
+            
+            // Update bow charging
+            if (player.isCharging && player.currentWeapon === 'bow') {
+                const chargeTime = Date.now() - player.chargeStartTime;
+                player.chargeLevel = Math.min(100, (chargeTime / WEAPONS.bow.chargeTime) * 100);
+                
+                // Drain stamina while charging
+                player.stamina = Math.max(0, player.stamina - WEAPONS.bow.staminaPerCharge);
             }
             
             // Update dash movement
@@ -194,6 +235,9 @@ class GameRoom {
             effect.life--;
             return effect.life > 0;
         });
+        
+        // Update projectiles
+        this.updateProjectiles();
     }
 
     checkCollisions() {
@@ -316,13 +360,127 @@ class GameRoom {
     }
 
     getStickLine(player) {
-        const stickLength = 60;
+        const weapon = WEAPONS[player.currentWeapon];
+        const stickLength = weapon.length;
         const stickOffset = { x: 18, y: 24 };
         const startX = player.x + stickOffset.x;
         const startY = player.y + stickOffset.y;
         const endX = startX + Math.cos(player.stickAngle) * stickLength;
         const endY = startY + Math.sin(player.stickAngle) * stickLength;
         return { startX, startY, endX, endY };
+    }
+    
+    updateProjectiles() {
+        this.gameState.projectiles = this.gameState.projectiles.filter(projectile => {
+            // Update position
+            projectile.x += projectile.vx;
+            projectile.y += projectile.vy;
+            
+            // Apply gravity
+            projectile.vy += 0.3;
+            
+            // Check boundaries
+            if (projectile.x < 50 || projectile.x > 950 || 
+                projectile.y < 50 || projectile.y > 750) {
+                return false;
+            }
+            
+            // Check collision with players
+            this.players.forEach(player => {
+                if (player.id !== projectile.ownerId) {
+                    const dx = projectile.x - (player.x + 18);
+                    const dy = projectile.y - (player.y + 24);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 20) { // Hit player
+                        const damage = projectile.damage;
+                        player.health = Math.max(0, player.health - damage);
+                        
+                        // Add hit effect
+                        this.gameState.effects.push({
+                            type: 'hit',
+                            x: player.x + 18,
+                            y: player.y + 24,
+                            life: 15,
+                            damage: damage
+                        });
+                        
+                        projectile.hit = true;
+                    }
+                }
+            });
+            
+            // Check collision with weapons (deflection)
+            this.players.forEach(player => {
+                const stick = this.getStickLine(player);
+                const deflected = this.checkProjectileWeaponCollision(projectile, stick, player);
+                if (deflected) {
+                    // Add spark effect
+                    this.gameState.effects.push({
+                        type: 'spark',
+                        x: projectile.x,
+                        y: projectile.y,
+                        life: 10
+                    });
+                }
+            });
+            
+            projectile.life--;
+            return projectile.life > 0 && !projectile.hit;
+        });
+    }
+    
+    checkProjectileWeaponCollision(projectile, weapon, player) {
+        // Check if projectile intersects with weapon line
+        const dist = this.pointToLineDistance(
+            projectile.x, projectile.y,
+            weapon.startX, weapon.startY,
+            weapon.endX, weapon.endY
+        );
+        
+        if (dist < 8 && player.stickVelocity > 2) { // Close enough and weapon moving
+            // Deflect projectile
+            const angle = Math.atan2(weapon.endY - weapon.startY, weapon.endX - weapon.startX);
+            const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy);
+            
+            // Reflect velocity
+            projectile.vx = Math.cos(angle + Math.PI/2) * speed * 0.8;
+            projectile.vy = Math.sin(angle + Math.PI/2) * speed * 0.8;
+            projectile.ownerId = player.id; // Change ownership
+            
+            return true;
+        }
+        return false;
+    }
+    
+    pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        
+        if (lenSq !== 0) param = dot / lenSq;
+        
+        let xx, yy;
+        
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+        
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     lineIntersection(p1, p2, p3, p4) {
@@ -358,9 +516,15 @@ class GameRoom {
                 color: p.color,
                 dashReady: p.dashReady,
                 isDashing: p.isDashing,
-                isCrouching: p.isCrouching
+                isCrouching: p.isCrouching,
+                currentWeapon: p.currentWeapon,
+                isCharging: p.isCharging,
+                chargeLevel: p.chargeLevel,
+                weapons: p.weapons,
+                selectedWeaponSlot: p.selectedWeaponSlot
             })),
-            effects: this.gameState.effects
+            effects: this.gameState.effects,
+            projectiles: this.gameState.projectiles
         };
         
         io.to(this.id).emit('gameState', state);
@@ -392,8 +556,14 @@ class GameRoom {
             speed *= 0.5;
         }
         
-        // Don't allow movement during dash
-        if (!player.isDashing) {
+        // Check if any movement keys are pressed
+        const hasMovementInput = input.keys['w'] || input.keys['W'] || 
+                                input.keys['s'] || input.keys['S'] || 
+                                input.keys['a'] || input.keys['A'] || 
+                                input.keys['d'] || input.keys['D'];
+        
+        // Don't allow movement during dash or while crouching
+        if (!player.isDashing && !player.isCrouching) {
             if (input.keys['w'] || input.keys['W']) {
                 player.y = Math.max(mapBounds.top, player.y - speed);
                 player.isMoving = true;
@@ -412,15 +582,57 @@ class GameRoom {
             }
         }
         
+        // Always ensure movement stops when no keys are pressed (regardless of dash state)
+        if (!hasMovementInput) {
+            player.isMoving = false;
+        }
+        
         // Drain stamina for movement
         if (player.isMoving && player.stamina > 0) {
-            player.stamina = Math.max(0, player.stamina - 0.3);
+            player.stamina = Math.max(0, player.stamina - 0.2);
         }
         
         // Update stick target angle
         const dx = input.mouseX - (player.x + 18);
         const dy = input.mouseY - (player.y + 24);
         player.targetStickAngle = Math.atan2(dy, dx);
+        
+        // Handle healing (H key) - heals both players
+        if (input.keys['h'] || input.keys['H']) {
+            this.players.forEach(p => {
+                p.health = 10000; // Set to max health for testing
+            });
+        }
+        
+        // Handle weapon switching (number keys)
+        for (let i = 1; i <= 5; i++) {
+            if (input.keys[i.toString()] && i <= player.weapons.length) {
+                player.selectedWeaponSlot = i - 1;
+                player.currentWeapon = player.weapons[i - 1];
+                player.isCharging = false; // Cancel charging when switching
+                player.chargeLevel = 0;
+            }
+        }
+        
+        // Handle bow charging and shooting
+        if (player.currentWeapon === 'bow') {
+            if (input.rightClick && !player.isCharging && player.stamina > 10) {
+                // Start charging
+                player.isCharging = true;
+                player.chargeStartTime = Date.now();
+                console.log(`Player ${player.id} started charging bow`);
+            } else if (player.isCharging && !input.rightClick) {
+                // Release arrow
+                console.log(`Player ${player.id} releasing arrow, charge level: ${player.chargeLevel}`);
+                if (player.chargeLevel > 20) { // Minimum charge to shoot
+                    this.fireArrow(player);
+                } else {
+                    console.log(`Charge level too low: ${player.chargeLevel}`);
+                }
+                player.isCharging = false;
+                player.chargeLevel = 0;
+            }
+        }
         
         // Handle dash activation (left click)
         if (input.leftClick && player.dashReady && !player.isDashing) {
@@ -468,6 +680,44 @@ class GameRoom {
                 });
             }
         }
+    }
+    
+    fireArrow(player) {
+        const chargePercent = player.chargeLevel / 100;
+        const speed = WEAPONS.bow.projectileSpeed * (0.5 + 0.5 * chargePercent);
+        const damage = 50 * chargePercent; // Scale damage with charge
+        
+        console.log(`Firing arrow: charge ${chargePercent * 100}%, speed ${speed}, damage ${damage}`);
+        
+        // Calculate arrow direction
+        const angle = player.stickAngle;
+        const startX = player.x + 18 + Math.cos(angle) * WEAPONS.bow.length;
+        const startY = player.y + 24 + Math.sin(angle) * WEAPONS.bow.length;
+        
+        // Create arrow projectile
+        const arrow = {
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'arrow',
+            x: startX,
+            y: startY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2, // Slight upward arc
+            damage: damage,
+            ownerId: player.id,
+            life: 180, // 3 seconds at 60fps
+            hit: false
+        };
+        
+        this.gameState.projectiles.push(arrow);
+        console.log(`Arrow created, total projectiles: ${this.gameState.projectiles.length}`);
+        
+        // Add shoot effect
+        this.gameState.effects.push({
+            type: 'spark',
+            x: startX,
+            y: startY,
+            life: 5
+        });
     }
 }
 

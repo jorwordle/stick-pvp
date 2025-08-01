@@ -90,7 +90,7 @@ class NetworkManager {
         }
     }
 
-    sendInput(keys, mouseX, mouseY, leftClick = false) {
+    sendInput(keys, mouseX, mouseY, leftClick = false, rightClick = false) {
         if (!this.connected || !this.gameStarted) return;
         
         const now = Date.now();
@@ -103,6 +103,7 @@ class NetworkManager {
             mouseX: mouseX,
             mouseY: mouseY,
             leftClick: leftClick,
+            rightClick: rightClick,
             timestamp: now
         };
         
