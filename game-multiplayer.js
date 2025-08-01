@@ -14,18 +14,19 @@ const game = {
 // Input handling
 const keys = {};
 const mouse = { x: 0, y: 0 };
+let leftClickPressed = false;
 
 // Player class (simplified for multiplayer)
 class Player {
     constructor(x, y, color = '#4a90e2', isLocal = false) {
         this.x = x;
         this.y = y;
-        this.width = 24;
-        this.height = 32;
+        this.width = 36;
+        this.height = 48;
         this.color = color;
         this.stickAngle = 0;
-        this.stickLength = 40;
-        this.stickOffset = { x: 12, y: 16 };
+        this.stickLength = 60;
+        this.stickOffset = { x: 18, y: 24 };
         this.health = 100;
         this.stamina = 100;
         this.isLocal = isLocal;
@@ -34,6 +35,11 @@ class Player {
         this.targetX = x;
         this.targetY = y;
         this.targetStickAngle = 0;
+        
+        // Dash and crouch states
+        this.dashReady = false;
+        this.isDashing = false;
+        this.isCrouching = false;
     }
 
     updateFromServer(serverData) {
@@ -42,6 +48,9 @@ class Player {
         this.health = serverData.health;
         this.stamina = serverData.stamina;
         this.targetStickAngle = serverData.stickAngle;
+        this.dashReady = serverData.dashReady;
+        this.isDashing = serverData.isDashing;
+        this.isCrouching = serverData.isCrouching;
     }
 
     interpolate() {
@@ -58,6 +67,17 @@ class Player {
     }
 
     draw() {
+        // Save context for potential transformations
+        ctx.save();
+        
+        // Apply crouch transformation
+        let drawHeight = this.height;
+        let yOffset = 0;
+        if (this.isCrouching) {
+            drawHeight = this.height * 0.6;
+            yOffset = this.height * 0.4;
+        }
+        
         // Draw shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.beginPath();
@@ -67,27 +87,27 @@ class Player {
 
         // Draw body
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.fillRect(this.x, this.y + yOffset, this.width, drawHeight);
         
         // Draw head
         ctx.fillStyle = '#f4c4a0';
         ctx.beginPath();
-        ctx.arc(this.x + this.width/2, this.y + 8, 8, 0, Math.PI * 2);
+        ctx.arc(this.x + this.width/2, this.y + yOffset + 12, 12, 0, Math.PI * 2);
         ctx.fill();
         
         // Draw eyes
         ctx.fillStyle = '#000';
-        ctx.fillRect(this.x + 6, this.y + 6, 3, 3);
-        ctx.fillRect(this.x + 15, this.y + 6, 3, 3);
+        ctx.fillRect(this.x + 10, this.y + yOffset + 9, 4, 4);
+        ctx.fillRect(this.x + 22, this.y + yOffset + 9, 4, 4);
 
         // Draw stick
         const stickStartX = this.x + this.stickOffset.x;
-        const stickStartY = this.y + this.stickOffset.y;
+        const stickStartY = this.y + this.stickOffset.y + (this.isCrouching ? yOffset : 0);
         const stickEndX = stickStartX + Math.cos(this.stickAngle) * this.stickLength;
         const stickEndY = stickStartY + Math.sin(this.stickAngle) * this.stickLength;
 
         ctx.strokeStyle = '#8b4513';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 6;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(stickStartX, stickStartY);
@@ -97,8 +117,26 @@ class Player {
         // Draw hand
         ctx.fillStyle = '#f4c4a0';
         ctx.beginPath();
-        ctx.arc(stickStartX, stickStartY, 4, 0, Math.PI * 2);
+        ctx.arc(stickStartX, stickStartY, 6, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Draw dash indicator
+        if (this.dashReady) {
+            // Ready - green circle
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x + this.width/2, this.y + this.height/2, 25, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (this.isLocal) {
+            // Show cooldown for local player only
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Dash', this.x + this.width/2, this.y - 5);
+        }
+        
+        ctx.restore();
     }
 }
 
@@ -128,6 +166,18 @@ canvas.addEventListener('mousemove', (e) => {
     mouse.y = e.clientY - rect.top;
 });
 
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // Left click
+        leftClickPressed = true;
+    }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0) { // Left click
+        leftClickPressed = false;
+    }
+});
+
 // Game loop
 function gameLoop() {
     // Clear canvas
@@ -153,18 +203,19 @@ function gameLoop() {
     // Draw map borders
     ctx.strokeStyle = '#666';
     ctx.lineWidth = 3;
-    ctx.strokeRect(50, 50, 700, 500);
+    ctx.strokeRect(50, 50, 900, 700);
     
     // Draw corner markers
     ctx.fillStyle = '#888';
-    const corners = [[50, 50], [750, 50], [50, 550], [750, 550]];
+    const corners = [[50, 50], [950, 50], [50, 750], [950, 750]];
     corners.forEach(([x, y]) => {
         ctx.fillRect(x - 5, y - 5, 10, 10);
     });
 
     if (network.isConnected()) {
-        // Send input to server
-        network.sendInput(keys, mouse.x, mouse.y);
+        // Send input to server with left click state
+        network.sendInput(keys, mouse.x, mouse.y, leftClickPressed);
+        leftClickPressed = false; // Reset after sending
         
         // Get server state
         const serverState = network.getState();
@@ -209,10 +260,12 @@ function gameLoop() {
         if (game.localPlayer) {
             drawStaminaBar(game.localPlayer, 20, 20);
             drawHealthBar(game.localPlayer, 20, 50);
+            drawDashIndicator(game.localPlayer, 20, 80);
         }
         if (game.remotePlayer) {
             drawStaminaBar(game.remotePlayer, canvas.width - 220, 20);
             drawHealthBar(game.remotePlayer, canvas.width - 220, 50);
+            drawDashIndicator(game.remotePlayer, canvas.width - 220, 80);
         }
     } else {
         // Show connection status
@@ -258,6 +311,17 @@ function drawEffects() {
                 ctx.textAlign = 'center';
                 ctx.fillText(Math.floor(effect.damage), effect.x, effect.y - (15 - effect.life) * 2);
             }
+            ctx.globalAlpha = 1;
+        } else if (effect.type === 'dash') {
+            // Draw dash trail
+            ctx.strokeStyle = effect.color || '#4a90e2';
+            ctx.globalAlpha = effect.life / 10;
+            ctx.lineWidth = 20;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(effect.x, effect.y);
+            ctx.lineTo(effect.x - 30, effect.y);
+            ctx.stroke();
             ctx.globalAlpha = 1;
         }
     });
@@ -305,6 +369,37 @@ function drawHealthBar(entity, x, y) {
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(`Health: ${Math.floor(entity.health)}/100`, x + barWidth/2, y + 14);
+}
+
+// Draw dash indicator
+function drawDashIndicator(entity, x, y) {
+    const barWidth = 200;
+    const barHeight = 20;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+    
+    if (entity.dashReady) {
+        // Dash ready - full green bar
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(x + 2, y + 2, barWidth - 4, barHeight - 4);
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Dash Ready! (Left Click)', x + barWidth/2, y + 14);
+    } else {
+        // Show cooldown progress
+        ctx.fillStyle = '#666';
+        ctx.fillRect(x + 2, y + 2, barWidth - 4, barHeight - 4);
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Dash Cooldown', x + barWidth/2, y + 14);
+    }
+    
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, barWidth, barHeight);
 }
 
 // Start game
